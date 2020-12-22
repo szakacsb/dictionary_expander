@@ -172,28 +172,26 @@ def tag_text(text, model, enc_data):
     return [p_text[i] + "[" + vec2tag[pred[i]] + "]" for i in range(len(pred))]
 
 
-def create_conv(word_len, char_len, vec2tag, file=None):
+def create_conv(word_len, char_len, vec2tag, embedding,  init_mode, optimizer, file=None):
     words_input = Input(shape=(31,), dtype='int32', name='words_input')
-    words_embendding = Embedding(word_len, 128)(words_input)
-    conv1d_out1 = Conv1D(20, 3, activation='relu')(words_embendding)
-    maxpool_out1 = MaxPooling1D(20)(conv1d_out1)
-    words = Flatten()(maxpool_out1)
+    words_embendding = Embedding(word_len, embedding, embeddings_initializer=init_mode)(words_input)
+    conv1d_out1 = Conv1D(20, 3, activation='relu', kernel_initializer=init_mode)(words_embendding)
+    words = Flatten()(conv1d_out1)
 
     char_input = Input(shape=(40, char_len,), name='char_input')
-    conv1d_out = Conv1D(30, 3, activation='relu')(char_input)
-    maxpool_out = MaxPooling1D(30)(conv1d_out)
-    char = Flatten()(maxpool_out)
+    conv1d_out = Conv1D(30, 3, activation='relu', kernel_initializer=init_mode)(char_input)
+    char = Flatten()(conv1d_out)
 
     output = concatenate([words, char])
-    output = Dense(512, activation="relu")(output)
-    output = Dropout(0.5)(output)
-    output = Dense(4096, activation="relu")(output)
-    output = Dropout(0.5)(output)
-    output = Dense(len(vec2tag), activation="softmax")(output)
+    output = Dense(512, activation="relu", kernel_initializer=init_mode)(output)
+    output = Dropout(0.3)(output)
+    output = Dense(4096, activation="relu", kernel_initializer=init_mode)(output)
+    output = Dropout(0.3)(output)
+    output = Dense(len(vec2tag), activation="softmax", kernel_initializer=init_mode)(output)
 
     model = Model(inputs=[words_input, char_input], outputs=[output])
     model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer="nadam",
+                  optimizer=optimizer,
                   metrics=["accuracy"])
 
     model.summary()
@@ -202,59 +200,56 @@ def create_conv(word_len, char_len, vec2tag, file=None):
     return model
 
 
-def create_lstm(word_len, char_len, vec2tag, file=None):
+def create_lstm(word_len, char_len, vec2tag, embedding, init_mode, optimizer, file=None):
     words_input = Input(shape=(31,), dtype='int32', name='words_input')
-    words_embendding = Embedding(word_len, 128)(words_input)
-    lstm_out1 = Bidirectional(LSTM(32))(words_embendding)
-    words = Dense(64)(lstm_out1)
+    words_embendding = Embedding(word_len, embedding, embeddings_initializer=init_mode)(words_input)
+    lstm_out1 = Bidirectional(LSTM(32, kernel_initializer=init_mode, dropout=0.1))(words_embendding)
+    words = Dense(64, activation="relu", kernel_initializer=init_mode)(lstm_out1)
 
     char_input = Input(shape=(40, char_len,), name='char_input')
-    conv1d_out = Conv1D(30, 3, activation='relu')(char_input)
-    maxpool_out = MaxPooling1D(30)(conv1d_out)
-    char = Flatten()(maxpool_out)
+    conv1d_out = Conv1D(30, 3, activation='relu', kernel_initializer=init_mode)(char_input)
+    char = Flatten()(conv1d_out)
 
     output = concatenate([words, char])
-    output = Dense(512, activation="relu")(output)
-    output = Dropout(0.5)(output)
-    output = Dense(4096, activation="relu")(output)
-    output = Dropout(0.5)(output)
-    output = Dense(len(vec2tag), activation="softmax")(output)
+    output = Dense(512, activation="relu", kernel_initializer=init_mode)(output)
+    output = Dropout(0.3)(output)
+    output = Dense(4096, activation="relu", kernel_initializer=init_mode)(output)
+    output = Dropout(0.3)(output)
+    output = Dense(len(vec2tag), activation="softmax", kernel_initializer=init_mode)(output)
 
     model = Model(inputs=[words_input, char_input], outputs=[output])
     model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer="nadam",
+                  optimizer=optimizer,
                   metrics=["accuracy"])
 
-    model.summary()
     model.summary()
     if file is not None:
         model.load_weights(file)
     return model
 
 
-def create_lstm2(word_len, char_len, vec2tag, file=None):
+def create_lstm2(word_len, char_len, vec2tag, embedding, init_mode, optimizer, file=None):
     words_input = Input(shape=(31,), dtype='int32', name='words_input')
-    words_embendding = Embedding(word_len, 128)(words_input)
-    lstm_out1 = Bidirectional(LSTM(32))(words_embendding)
-    words = Dense(64)(lstm_out1)
+    words_embendding = Embedding(word_len, embedding, embeddings_initializer=init_mode)(words_input)
+    lstm_out1 = Bidirectional(LSTM(32, kernel_initializer=init_mode, dropout=0.1))(words_embendding)
+    words = Dense(64, kernel_initializer=init_mode)(lstm_out1)
 
     char_input = Input(shape=(40, char_len,), name='char_input')
-    lstm_out2 = Bidirectional(LSTM(32))(char_input)
+    lstm_out2 = Bidirectional(LSTM(32, kernel_initializer=init_mode, dropout=0.1))(char_input)
     char = Dense(64)(lstm_out2)
 
     output = concatenate([words, char])
-    output = Dense(512, activation="relu")(output)
+    output = Dense(512, activation="relu", kernel_initializer=init_mode)(output)
     output = Dropout(0.5)(output)
-    output = Dense(4096, activation="relu")(output)
+    output = Dense(4096, activation="relu", kernel_initializer=init_mode)(output)
     output = Dropout(0.5)(output)
-    output = Dense(len(vec2tag), activation="softmax")(output)
+    output = Dense(len(vec2tag), activation="softmax", kernel_initializer=init_mode)(output)
 
     model = Model(inputs=[words_input, char_input], outputs=[output])
     model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer="nadam",
+                  optimizer=optimizer,
                   metrics=["accuracy"])
 
-    model.summary()
     model.summary()
     if file is not None:
         model.load_weights(file)
