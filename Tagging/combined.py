@@ -1,4 +1,5 @@
 from keras.models import Model
+from keras.callbacks import EarlyStopping
 from keras.layers import TimeDistributed, Conv1D, Dense, Embedding, Input, Dropout, Bidirectional, MaxPooling1D,\
     Flatten, concatenate, LSTM
 from keras.initializers import RandomUniform
@@ -12,7 +13,7 @@ from common import prepare_corpus, prepare_dict_simple, prepare_sets, create_lst
 
 
 
-def train(conv_model_name="../Models/model_conv_c32e8.hf5", bilstm_model_name="../Models/model_lstm_c32e8.hf5",
+def train(conv_model_name="../Models/model_conv47.hf5", bilstm_model_name="../Models/model_lstm47.hf5",
           corpus_path="http://localhost:8983/solr/mikes", excluded_file="exluded.txt"):
     excluded = []
     file = open(excluded_file, encoding="utf-8", mode="r")
@@ -23,38 +24,59 @@ def train(conv_model_name="../Models/model_conv_c32e8.hf5", bilstm_model_name=".
     word2vec, word_len, char2vec, char_len, tag2vec, tag_len, vec2tag, example_array, excluded, test_array \
         = prepare_corpus(corpus_path+"/select", 0.0, excluded)
 
+    print(len(excluded))
+    print(len(example_array))
+    print(len(test_array))
+
+    # file = open(excluded_file, encoding="utf-8", mode="w")
+    # for w in excluded:
+    #     file.write(w+"\n")
+    # file.close()
+
     d, l = prepare_dict_simple(corpus_path+"/select")
 
-    model = create_conv(word_len, char_len, vec2tag, conv_model_name)
-    for i in range(32):
-        (train_xw, valid_xw, test_xw), (train_xc, valid_xc, test_xc), (train_y, valid_y, test_y), _ = \
-            prepare_sets(word2vec, word_len, char2vec, char_len, tag2vec, tag_len, vec2tag, example_array,
-                         (0.95, 0.0), (i*10000, (i+1)*10000))
-    
-        model.fit([train_xw, train_xc], train_y, batch_size=128, epochs=8, validation_split=0.05)
-    
-        scores = model.evaluate([test_xw, test_xc], test_y)
-        model.save_weights('model_conv'+str(i)+'.hf5')
-    
-        print(scores)
+    test_array = np.random.permutation(test_array)
+    (_, _, test_xw), (_, _, test_xc), (_, _, test_y), (_, _, test_sw) = \
+        prepare_sets(word2vec, word_len, char2vec, char_len, tag2vec, tag_len, vec2tag, test_array[:1000], (0.0, 0.0),
+                     (0, len(test_array[:1000])))
 
-    model1 = create_lstm(word_len, char_len, vec2tag, bilstm_model_name)
-    for i in range(32):
-    
-        (train_xw, valid_xw, test_xw), (train_xc, valid_xc, test_xc), (train_y, valid_y, test_y), _ = \
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=3, restore_best_weights=True)
+    print(word_len, char_len)
+    model = create_conv(word_len, char_len, vec2tag, 256, 'lecun_uniform', "Nadam", conv_model_name)
+    for i in range(0):
+        print(str(i) + ". iteration\n-----------------------------------------\n")
+
+        (train_xw, valid_xw, _), (train_xc, valid_xc, _), (train_y, valid_y, _), _ = \
             prepare_sets(word2vec, word_len, char2vec, char_len, tag2vec, tag_len, vec2tag, example_array,
-                         (0.95, 0.0), (i*10000, (i+1)*10000))
-        model1.fit([train_xw, train_xc], train_y, batch_size=128, epochs=8, validation_split=0.05)
-    
-        scores = model1.evaluate([test_xw, test_xc], test_y)
-        model1.save_weights('model_lstm'+str(i)+'.hf5')
-    
-        print(scores)
+                         (1.0, 0.0), (i*10000, (i+1)*10000))
+
+        model.fit([train_xw, train_xc], train_y, batch_size=64, epochs=32, validation_split=0.1, callbacks=[es])
+
+        #scores = model.evaluate([test_xw, test_xc], test_y)
+        #print(scores)
+        
+        if i == 0 or i == 15 or i == 31 or i == 47:
+            model.save_weights('model_conv' + str(i) + '.hf5')
+
+    model1 = create_lstm(word_len, char_len, vec2tag, 256, 'lecun_uniform', 'Nadam', bilstm_model_name)
+    for i in range(0):
+        print(str(i) + ". iteration\n-----------------------------------------\n")
+
+        (train_xw, valid_xw, _), (train_xc, valid_xc, _), (train_y, valid_y, _), _ = \
+            prepare_sets(word2vec, word_len, char2vec, char_len, tag2vec, tag_len, vec2tag, example_array,
+                         (1.0, 0.0), (i*10000, (i+1)*10000))
+        model1.fit([train_xw, train_xc], train_y, batch_size=64, epochs=32, validation_split=0.1, callbacks=[es])
+
+        #scores = model1.evaluate([test_xw, test_xc], test_y)
+        #print(scores)
+
+        if i == 0 or i == 15 or i == 31 or i == 47:
+            model1.save_weights('model_lstm' + str(i) + '.hf5')
 
     (_, _, test_xw), (_, _, test_xc), (_, _, test_y), (_, _, test_sw) = \
         prepare_sets(word2vec, word_len, char2vec, char_len, tag2vec, tag_len, vec2tag, test_array, (0.0, 0.0),
                      (0, len(test_array)))
-    
+
     scores = model.evaluate([test_xw, test_xc], test_y)
     print(scores)
     scores = model1.evaluate([test_xw, test_xc], test_y)
@@ -96,7 +118,7 @@ def train(conv_model_name="../Models/model_conv_c32e8.hf5", bilstm_model_name=".
     return
 
 
-def parse(text, conv_model_name="../Models/model_conv_c32e8.hf5", bilstm_model_name="../Models/model_lstm_c32e8.hf5",
+def parse(text, conv_model_name="../Models/model_conv47.hf5", bilstm_model_name="../Models/model_lstm47.hf5",
           corpus_path="http://localhost:8983/solr/mikes", excluded_file="exluded.txt"):
     excluded = []
     file = open(excluded_file, encoding="utf-8", mode="r")
@@ -107,9 +129,13 @@ def parse(text, conv_model_name="../Models/model_conv_c32e8.hf5", bilstm_model_n
     word2vec, word_len, char2vec, char_len, tag2vec, tag_len, vec2tag, example_array, excluded, test_array \
         = prepare_corpus(corpus_path+"/select", 0.0, excluded)
 
+    print(len(excluded))
+    print(len(example_array))
+    print(len(test_array))
+
     d, l = prepare_dict_simple(corpus_path+"/select")
-    model = create_conv(word_len, char_len, vec2tag, conv_model_name)
-    model1 = create_lstm(word_len, char_len, vec2tag, bilstm_model_name)
+    model = create_conv(word_len, char_len, vec2tag, 256, 'lecun_uniform', 'Nadam', conv_model_name)
+    model1 = create_lstm(word_len, char_len, vec2tag, 256, 'lecun_uniform', 'Nadam', bilstm_model_name)
 
     pred = tag_text_combined(text, model, model1, d, l, (word2vec, word_len, char2vec, char_len, tag2vec, tag_len, vec2tag))
     result = ""
