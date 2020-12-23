@@ -14,7 +14,7 @@ from common import prepare_corpus, prepare_dict_simple, prepare_sets, create_lst
 
 
 def train(conv_model_name="../Models/model_conv47.hf5", bilstm_model_name="../Models/model_lstm47.hf5",
-          corpus_path="http://localhost:8983/solr/mikes", excluded_file="exluded.txt"):
+          corpus_path="http://localhost:8983/solr/mikes", excluded_file="excluded.txt"):
     excluded = []
     file = open(excluded_file, encoding="utf-8", mode="r")
     for w in file:
